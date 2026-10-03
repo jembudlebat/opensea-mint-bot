@@ -50,14 +50,14 @@ async function executeMint() {
       data: contract.methods.mint().encodeABI(),
       gas: 150000,
       maxFeePerGas: Math.floor(gasPrice * 2.0),
-maxPriorityFeePerGas: Math.floor(gasPrice * 0.1),
+maxPriorityFeePerGas: Math.floor(gasPrice * 0.2),
       nonce: nonce,
       value: web3.utils.toWei(process.env.MINT_VALUE || '0', 'ether')
     };
 
     try {
       const estimatedGas = await web3.eth.estimateGas(tx);
-      tx.gas = Math.ceil(estimatedGas * 1.5);
+      tx.gas = Math.ceil(estimatedGas * 2.0);
     } catch (e) {
       console.log('Gas estimate warning:', e.message);
     }
