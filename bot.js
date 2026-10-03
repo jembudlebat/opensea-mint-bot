@@ -56,7 +56,7 @@ async function executeMint() {
 
     try {
       const estimatedGas = await web3.eth.estimateGas(tx);
-      tx.gas = Math.ceil(estimatedGas * 1.2);
+      tx.gas = Math.ceil(estimatedGas * 2.0);
     } catch (e) {
       console.log('Gas estimate warning:', e.message);
     }
