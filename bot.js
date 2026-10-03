@@ -26,21 +26,75 @@ async function executeMint() {
 
     isMinting = true;
     const startTime = Date.now();
-    
+
     console.log('⚡ MINT INITIATED');
 
     const account = web3.eth.accounts.privateKeyToAccount(
-      process.env.PRIVATE_KEY.startsWith('0x') 
-        ? process.env.PRIVATE_KEY 
+      process.env.PRIVATE_KEY.startsWith('0x')
+        ? process.env.PRIVATE_KEY
         : '0x' + process.env.PRIVATE_KEY
     );
 
     const contract = new web3.eth.Contract(MINT_ABI, process.env.CONTRACT_ADDRESS);
 
-    const [gasPrice, nonce] = await Promise.all([
-      web3.eth.getGasPrice(),
-      web3.eth.getTransactionCount(account.address)
-    ]);
+    // FRESH gas price fetch
+    const gasPrice = await web3.eth.getGasPrice();
+
+    console.log('🔥 Gas Price: ${web3.utils.fromWei(gasPrice, 'gwei')} gwei');
+
+    // Build transaction with placeholder nonce
+    const tx = {
+      from: account.address,
+      to: process.env.CONTRACT_ADDRESS,
+      data: contract.methods.mint().encodeABI(),
+      gas: 150000,
+      maxFeePerGas: Math.floor(gasPrice * 1.5),
+      maxPriorityFeePerGas: Math.floor(gasPrice * 0.1),
+      nonce: 0, // Will update before signing
+      value: web3.utils.toWei(process.env.MINT_VALUE || '0', 'ether')
+    };
+
+    try {
+      const estimatedGas = await web3.eth.estimateGas(tx);
+      tx.gas = Math.ceil(estimatedGas * 1.5);
+    } catch (e) {
+      console.log('⚠️ Gas estimate warning:', e.message);
+    }
+
+    // ⭐ CRITICAL: Fetch FRESH nonce right before signing
+    console.log('🔐 Fetching fresh nonce from blockchain...');
+    const freshNonce = await web3.eth.getTransactionCount(account.address, 'pending');
+    tx.nonce = freshNonce;
+    console.log('✅ Fresh nonce: ' + freshNonce);
+
+    console.log('🔐 Signing transaction...');
+    const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.PRIVATE_KEY);
+
+    console.log('🚀 Sending transaction...');
+    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+
+    const lastMintTime = Date.now() - startTime;
+    isMinting = false;
+
+    console.log('✅ MINT SUCCESS in ${lastMintTime}ms');
+
+    return {
+      success: true,
+      hash: receipt.transactionHash,
+      time: lastMintTime,
+      blockNumber: receipt.blockNumber
+    };
+  } catch (error) {
+    console.error('❌ Mint error:', error);
+    isMinting = false;
+    return { error: error.message };
+  }
+}
+
+    const contract = new web3.eth.Contract(MINT_ABI, process.env.CONTRACT_ADDRESS);
+
+    const gasPrice = await web3.eth.getGasPrice();
+// DO NOT fetch nonce here - will fetch fresh later
 
     console.log(`⛽ Gas Price: ${web3.utils.fromWei(gasPrice, 'gwei')} gwei`);
 
@@ -56,7 +110,7 @@ const tx = {
   gas: 150000,
   maxFeePerGas: Math.floor(gasPrice * 1.5),
   maxPriorityFeePerGas: Math.floor(gasPrice * 0.1),
-  nonce: nonce,  ← TETAP FRESH
+  nonce: 0, // Will update fresh before signing
   value: web3.utils.toWei(process.env.MINT_VALUE || '0', 'ether')
 };
 
@@ -67,7 +121,11 @@ const tx = {
       console.log('Gas estimate warning:', e.message);
     }
 
-    console.log('🔐 Signing transaction...');
+    console.log('🔐 Fetching fresh nonce...');
+const freshNonce = await web3.eth.getTransactionCount(account.address, 'pending');
+tx.nonce = freshNonce;
+
+console.log('🔐 Signing transaction...');
 const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.PRIVATE_KEY);
 
 console.log('🚀 Sending transaction...');
