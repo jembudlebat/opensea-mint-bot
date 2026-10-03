@@ -63,10 +63,49 @@ maxPriorityFeePerGas: Math.floor(gasPrice * 0.2),
     }
 
     console.log('🔐 Signing transaction...');
-    const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.PRIVATE_KEY);
+const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.PRIVATE_KEY);
 
-    console.log('📤 Sending transaction...');
-    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+console.log('🚀 Sending transaction...');
+
+// Retry logic untuk handle dynamic gas price
+let receipt;
+let retryCount = 0;
+const maxRetries = 3;
+
+while (retryCount < maxRetries) {
+  try {
+    receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+    break; // Success, exit loop
+  } catch (error) {
+    retryCount++;
+    console.log(`❌ Attempt ${retryCount} failed: ${error.message}`);
+    
+    // Jika error gas price, rebuild transaction dengan gas lebih tinggi
+    if (error.message.includes('maxFeePerGas') || error.message.includes('gas')) {
+      if (retryCount < maxRetries) {
+        console.log(`🔄 Retrying with higher gas...`);
+        
+        // Fetch gas price lagi
+        const newGasPrice = await web3.eth.getGasPrice();
+        tx.maxFeePerGas = Math.floor(newGasPrice * 2.0);
+        tx.maxPriorityFeePerGas = Math.floor(newGasPrice * 0.2);
+        
+        // Re-sign transaction
+        const newSignedTx = await web3.eth.accounts.signTransaction(tx, process.env.PRIVATE_KEY);
+        
+        // Coba submit lagi
+        try {
+          receipt = await web3.eth.sendSignedTransaction(newSignedTx.rawTransaction);
+          break;
+        } catch (retryError) {
+          if (retryCount === maxRetries) throw retryError;
+        }
+      }
+    } else {
+      throw error;
+    }
+  }
+}
 
     lastMintTime = Date.now() - startTime;
     isMinting = false;
