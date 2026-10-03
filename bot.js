@@ -91,89 +91,65 @@ async function executeMint() {
   }
 }
 
+async function executeMint() {
+  try {
+    if (isMinting) {
+      return { error: 'Already minting!' };
+    }
+
+    isMinting = true;
+    const startTime = Date.now();
+
+    console.log('⚡ MINT INITIATED');
+
+    const account = web3.eth.accounts.privateKeyToAccount(
+      process.env.PRIVATE_KEY.startsWith('0x')
+        ? process.env.PRIVATE_KEY
+        : '0x' + process.env.PRIVATE_KEY
+    );
+
     const contract = new web3.eth.Contract(MINT_ABI, process.env.CONTRACT_ADDRESS);
 
-    const gasPrice = await web3.eth.getGasPrice();
-// DO NOT fetch nonce here - will fetch fresh later
-
-    console.log(`⛽ Gas Price: ${web3.utils.fromWei(gasPrice, 'gwei')} gwei`);
-
+    // FRESH gas price fetch
     const gasPrice = await web3.eth.getGasPrice();
 
-// Fetch nonce fresh sebelum build tx
-const nonce = await web3.eth.getTransactionCount(account.address, 'pending');
+    console.log('🔥 Gas Price: ${web3.utils.fromWei(gasPrice, 'gwei')} gwei');
 
-const tx = {
-  from: account.address,
-  to: process.env.CONTRACT_ADDRESS,
-  data: contract.methods.mint().encodeABI(),
-  gas: 150000,
-  maxFeePerGas: Math.floor(gasPrice * 1.5),
-  maxPriorityFeePerGas: Math.floor(gasPrice * 0.1),
-  nonce: 0, // Will update fresh before signing
-  value: web3.utils.toWei(process.env.MINT_VALUE || '0', 'ether')
-};
+    // Build transaction with placeholder nonce
+    const tx = {
+      from: account.address,
+      to: process.env.CONTRACT_ADDRESS,
+      data: contract.methods.mint().encodeABI(),
+      gas: 150000,
+      maxFeePerGas: Math.floor(gasPrice * 1.5),
+      maxPriorityFeePerGas: Math.floor(gasPrice * 0.1),
+      nonce: 0, // Will update before signing
+      value: web3.utils.toWei(process.env.MINT_VALUE || '0', 'ether')
+    };
 
     try {
       const estimatedGas = await web3.eth.estimateGas(tx);
-      tx.gas = Math.ceil(estimatedGas * 1.2);
+      tx.gas = Math.ceil(estimatedGas * 1.5);
     } catch (e) {
-      console.log('Gas estimate warning:', e.message);
+      console.log('⚠️ Gas estimate warning:', e.message);
     }
 
-    console.log('🔐 Fetching fresh nonce...');
-const freshNonce = await web3.eth.getTransactionCount(account.address, 'pending');
-tx.nonce = freshNonce;
+    // ⭐ CRITICAL: Fetch FRESH nonce right before signing
+    console.log('🔐 Fetching fresh nonce from blockchain...');
+    const freshNonce = await web3.eth.getTransactionCount(account.address, 'pending');
+    tx.nonce = freshNonce;
+    console.log('✅ Fresh nonce: ' + freshNonce);
 
-console.log('🔐 Signing transaction...');
-const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.PRIVATE_KEY);
+    console.log('🔐 Signing transaction...');
+    const signedTx = await web3.eth.accounts.signTransaction(tx, process.env.PRIVATE_KEY);
 
-console.log('🚀 Sending transaction...');
+    console.log('🚀 Sending transaction...');
+    const receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
 
-// Retry logic untuk handle dynamic gas price
-let receipt;
-let retryCount = 0;
-const maxRetries = 3;
-
-while (retryCount < maxRetries) {
-  try {
-    receipt = await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-    break; // Success, exit loop
-  } catch (error) {
-    retryCount++;
-    console.log(`❌ Attempt ${retryCount} failed: ${error.message}`);
-    
-    // Jika error gas price, rebuild transaction dengan gas lebih tinggi
-    if (error.message.includes('maxFeePerGas') || error.message.includes('gas')) {
-      if (retryCount < maxRetries) {
-        console.log(`🔄 Retrying with higher gas...`);
-        
-        // Fetch gas price lagi
-        const newGasPrice = await web3.eth.getGasPrice();
-        tx.maxFeePerGas = Math.floor(newGasPrice * 2.0);
-        tx.maxPriorityFeePerGas = Math.floor(newGasPrice * 0.2);
-        
-        // Re-sign transaction
-        const newSignedTx = await web3.eth.accounts.signTransaction(tx, process.env.PRIVATE_KEY);
-        
-        // Coba submit lagi
-        try {
-          receipt = await web3.eth.sendSignedTransaction(newSignedTx.rawTransaction);
-          break;
-        } catch (retryError) {
-          if (retryCount === maxRetries) throw retryError;
-        }
-      }
-    } else {
-      throw error;
-    }
-  }
-}
-
-    lastMintTime = Date.now() - startTime;
+    const lastMintTime = Date.now() - startTime;
     isMinting = false;
 
-    console.log(`✅ MINT SUCCESS in ${lastMintTime}ms`);
+    console.log('✅ MINT SUCCESS in ${lastMintTime}ms');
 
     return {
       success: true,
@@ -181,7 +157,6 @@ while (retryCount < maxRetries) {
       time: lastMintTime,
       blockNumber: receipt.blockNumber
     };
-
   } catch (error) {
     console.error('❌ Mint error:', error);
     isMinting = false;
