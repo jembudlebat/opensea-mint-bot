@@ -44,16 +44,21 @@ async function executeMint() {
 
     console.log(`⛽ Gas Price: ${web3.utils.fromWei(gasPrice, 'gwei')} gwei`);
 
-    const tx = {
-      from: account.address,
-      to: process.env.CONTRACT_ADDRESS,
-      data: contract.methods.mint().encodeABI(),
-      gas: 150000,
-      maxFeePerGas: Math.floor(gasPrice * 1.2),
-maxPriorityFeePerGas: Math.floor(gasPrice * 0.1),
-      nonce: nonce,
-      value: web3.utils.toWei(process.env.MINT_VALUE || '0', 'ether')
-    };
+    const gasPrice = await web3.eth.getGasPrice();
+
+// Fetch nonce fresh sebelum build tx
+const nonce = await web3.eth.getTransactionCount(account.address);
+
+const tx = {
+  from: account.address,
+  to: process.env.CONTRACT_ADDRESS,
+  data: contract.methods.mint().encodeABI(),
+  gas: 150000,
+  maxFeePerGas: Math.floor(gasPrice * 1.5),
+  maxPriorityFeePerGas: Math.floor(gasPrice * 0.1),
+  nonce: nonce,  ← TETAP FRESH
+  value: web3.utils.toWei(process.env.MINT_VALUE || '0', 'ether')
+};
 
     try {
       const estimatedGas = await web3.eth.estimateGas(tx);
