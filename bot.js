@@ -63,7 +63,7 @@ async function executeMint() {
 
     // ⭐ CRITICAL: Fetch FRESH nonce right before signing
     console.log('🔐 Fetching fresh nonce from blockchain...');
-    const freshNonce = await web3.eth.getTransactionCount(account.address, 'pending');
+    const freshNonce = await web3.eth.getTransactionCount(account.address);
     tx.nonce = freshNonce;
     console.log('✅ Fresh nonce: ' + freshNonce);
 
