@@ -47,7 +47,7 @@ async function executeMint() {
     const gasPrice = await web3.eth.getGasPrice();
 
 // Fetch nonce fresh sebelum build tx
-const nonce = await web3.eth.getTransactionCount(account.address);
+const nonce = await web3.eth.getTransactionCount(account.address, 'pending');
 
 const tx = {
   from: account.address,
