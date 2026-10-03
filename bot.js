@@ -47,7 +47,7 @@ async function executeMint() {
       from: account.address,
       to: process.env.CONTRACT_ADDRESS,
       data: contract.methods.mint().encodeABI(),
-      gas: 150000,
+      gas: 300000,
       maxFeePerGas: Math.floor(gasPrice * 1.5),
       maxPriorityFeePerGas: Math.floor(gasPrice * 0.1),
       nonce: 0, // Will update before signing
